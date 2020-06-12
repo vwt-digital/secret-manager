@@ -9,7 +9,7 @@ The actual content of a secret needs to be inserted by a user or by code.
 Some prerequisites:
 * Create a secrets.json file.
 * Enable Secret Manager API in your GCP projects.
-* Ensure  the service account you are using has the right permissions to managed secrets and secret bindings.
+* Ensure the service account you are using has the right permissions to manage secrets.
 
 Run the python script:
 ```bash

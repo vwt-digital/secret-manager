@@ -153,7 +153,9 @@ def main(args):
         for secret_id in list(set(gcp_secrets) - set(secrets)):
             delete_secret(client, project_id, secret_id)
 
-        for secret_id in list(set(gcp_secrets) - (set(gcp_secrets) - set(secrets))):
+        gcp_secrets = list_secrets(client, project_id)
+
+        for secret_id in gcp_secrets:
             bindings = permissions_to_bindings(permissions, secret_id)
             gcp_bindings = list_secret_bindings(client, project_id, secret_id)
 
