@@ -2,6 +2,8 @@ import json
 import logging
 import argparse
 
+from googleapiclient import discovery
+from oauth2client.client import GoogleCredentials
 from google.cloud import secretmanager_v1
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)7s: %(message)s')
@@ -122,6 +124,38 @@ def permissions_to_bindings(permissions, secret_id):
     return bindings
 
 
+def get_project(service, project_id):
+    """
+    Returns a project dict given a project_id.
+    """
+
+    request = service.projects().get(projectId=project_id)
+    response = request.execute()
+
+    return response
+
+
+def list_projects(service, filter):
+    """
+    Returns a list of projects matching a filter.
+    """
+
+    response = service.projects().list(filter=filter).execute()
+
+    return response['projects']
+
+
+def make_service():
+    """
+    Creates a cloudresourcemanager service.
+    """
+
+    credentials = GoogleCredentials.get_application_default()
+    service = discovery.build('cloudresourcemanager', 'v1beta1', credentials=credentials)
+
+    return service
+
+
 def parse_args():
     """
     A simple function to parse command line arguments.
@@ -131,19 +165,32 @@ def parse_args():
     parser.add_argument('-s', '--secrets-file',
                         required=True,
                         help='path to secrets.json file')
+    parser.add_argument('-p', '--project-id',
+                        required=True,
+                        help='project id of the current project')
     return parser.parse_args()
 
 
 def main(args):
 
-    client = secretmanager_v1.SecretManagerServiceClient()
-    documented_secrets = read_secrets(args.secrets_file)
+    service = make_service()
 
-    for project in documented_secrets:
+    project = get_project(service, args.project_id)
+    filter = 'parent.id:{}'.format(project['parent']['id'])
+    projects = list_projects(service, filter)
+
+    client = secretmanager_v1.SecretManagerServiceClient()
+    secrets_doc = read_secrets(args.secrets_file)
+
+    for project in projects:
 
         project_id = project['projectId']
-        secrets = project.get('secrets', [])
-        permissions = project.get('odrlPolicy').get('permission', [])
+
+        secrets = [item.get('secrets', []) for item in secrets_doc
+                   if item['projectId'] == project_id]
+
+        permissions = [item.get('odrlPolicy', {}).get('permission', []) for item in secrets_doc
+                       if item['projectId'] == project_id]
 
         gcp_secrets = list_secrets(client, project_id)
 
