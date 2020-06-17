@@ -151,7 +151,11 @@ def make_service():
     """
 
     credentials = GoogleCredentials.get_application_default()
-    service = discovery.build('cloudresourcemanager', 'v1beta1', credentials=credentials)
+    service = discovery.build(
+        'cloudresourcemanager',
+        'v1beta1',
+        credentials=credentials,
+        cache_discovery=False)
 
     return service
 
