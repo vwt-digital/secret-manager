@@ -160,6 +160,32 @@ def make_service():
     return service
 
 
+def get_secrets(secrets_doc, project_id):
+    """
+    Returns the secrets from a secrets_doc for a given project_id.
+    """
+
+    secrets = []
+    for item in secrets_doc:
+        if item.get('projectId') == project_id:
+            secrets.extend(item.get('secrets', []))
+
+    return secrets
+
+
+def get_permissions(secrets_doc, project_id):
+    """
+    Returns the permissions from a secrets_doc for a given project_id.
+    """
+
+    permissions = []
+    for item in secrets_doc:
+        if item.get('projectId') == project_id:
+            permissions.extend(item.get('odrlPolicy', {}).get('permission', []))
+
+    return permissions
+
+
 def parse_args():
     """
     A simple function to parse command line arguments.
@@ -189,12 +215,10 @@ def main(args):
     for project in projects:
 
         project_id = project['projectId']
+        logging.info('Checking secrets in {}'.format(project_id))
 
-        secrets = [item.get('secrets', []) for item in secrets_doc
-                   if item['projectId'] == project_id]
-
-        permissions = [item.get('odrlPolicy', {}).get('permission', []) for item in secrets_doc
-                       if item['projectId'] == project_id]
+        secrets = get_secrets(secrets_doc, project_id)
+        permissions = get_permissions(secrets_doc, project_id)
 
         gcp_secrets = list_secrets(client, project_id)
 
