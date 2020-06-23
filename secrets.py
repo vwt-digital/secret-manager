@@ -5,6 +5,7 @@ import argparse
 from googleapiclient import discovery
 from oauth2client.client import GoogleCredentials
 from google.cloud import secretmanager_v1
+from google.api_core.exceptions import PermissionDenied
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)7s: %(message)s')
 
@@ -23,8 +24,12 @@ def list_secrets(client, project_id):
     List secrets for a given project.
     """
 
-    parent = client.project_path(project_id)
-    response = client.list_secrets(parent)
+    try:
+        parent = client.project_path(project_id)
+        response = client.list_secrets(parent)
+    except PermissionDenied as e:
+        logging.info(e)
+        return []
 
     return [secret.name.split('/')[-1] for secret in response]
 
