@@ -46,7 +46,7 @@ def create_secret(location, project_id, secret_id):
 
     _ = exec_shell_command([
         'gcloud', 'secrets', 'create', secret_id,
-        '--replication-policy=automatic',
+        '--replication-policy=user-managed',
         '--locations={}'.format(location),
         '--project={}'.format(project_id)
     ])
