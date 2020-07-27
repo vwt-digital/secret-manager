@@ -1,6 +1,7 @@
 import json
 import logging
 import argparse
+import subprocess
 
 from googleapiclient import discovery
 from oauth2client.client import GoogleCredentials
@@ -8,6 +9,8 @@ from google.cloud import secretmanager_v1
 from google.api_core import exceptions
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)7s: %(message)s')
+
+DEFAULT_REGION = 'europe-west1'
 
 
 def read_secrets(path):
@@ -25,6 +28,7 @@ def list_secrets(client, project_id):
     """
 
     try:
+
         parent = client.project_path(project_id)
         response = client.list_secrets(parent)
         secrets = [secret.name.split('/')[-1] for secret in response]
@@ -35,19 +39,19 @@ def list_secrets(client, project_id):
     return secrets
 
 
-def create_secret(client, project_id, secret_id):
+def create_secret(location, project_id, secret_id):
     """
     Creates a secret in a project.
     """
 
-    parent = client.project_path(project_id)
-    response = client.create_secret(parent, secret_id, {
-        'replication': {
-            'automatic': {},
-        },
-    })
+    _ = exec_shell_command([
+        'gcloud', 'secrets', 'create', secret_id,
+        '--replication-policy=user-managed',
+        '--locations={}'.format(location),
+        '--project={}'.format(project_id)
+    ])
 
-    logging.info('Created secret: {}'.format(response.name))
+    logging.info('Created secret: {}'.format(secret_id))
 
 
 def delete_secret(client, project_id, secret_id):
@@ -192,6 +196,15 @@ def get_permissions(secrets_doc, project_id):
     return permissions
 
 
+def exec_shell_command(command):
+    """Executes a shell command"""
+
+    logging.info(' '.join(command))
+    process = subprocess.run(command, stdout=subprocess.PIPE, universal_newlines=True)
+
+    return process.stdout
+
+
 def parse_args():
     """
     A simple function to parse command line arguments.
@@ -229,7 +242,8 @@ def main(args):
         gcp_secrets = list_secrets(client, project_id)
 
         for secret_id in list(set(secrets) - set(gcp_secrets)):
-            create_secret(client, project_id, secret_id)
+            location = project.get('region', DEFAULT_REGION)
+            create_secret(location, project_id, secret_id)
 
         for secret_id in list(set(gcp_secrets) - set(secrets)):
             delete_secret(client, project_id, secret_id)
