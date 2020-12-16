@@ -28,7 +28,6 @@ def list_secrets(client, project_id):
     """
 
     try:
-
         parent = client.project_path(project_id)
         response = client.list_secrets(parent)
         secrets = [secret.name.split('/')[-1] for secret in response]
