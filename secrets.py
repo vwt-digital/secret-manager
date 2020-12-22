@@ -1,7 +1,8 @@
+import sys
 import json
 import logging
 import argparse
-import subprocess
+import subprocess  # nosec
 
 from googleapiclient import discovery
 from oauth2client.client import GoogleCredentials
@@ -169,15 +170,29 @@ def make_service():
     return service
 
 
+def get_project_secrets_spec(secrets_doc, project_id):
+    """
+    Returns the projects' secrets specification from a secrets_doc for a given project_id.
+    Returns None if project is not specified in secrets_doc
+    """
+    specs = []
+    for item in secrets_doc:
+        if item.get('projectId') == project_id:
+            specs.append(item)
+
+    return specs
+
+
 def get_secrets(secrets_doc, project_id):
     """
     Returns the secrets from a secrets_doc for a given project_id.
     """
 
     secrets = []
-    for item in secrets_doc:
-        if item.get('projectId') == project_id:
-            secrets.extend(item.get('secrets', []))
+    secrets_specs = get_project_secrets_spec(secrets_doc, project_id)
+
+    for spec in secrets_specs:
+        secrets.extend(spec.get('secrets', []))
 
     return secrets
 
@@ -199,7 +214,7 @@ def exec_shell_command(command):
     """Executes a shell command"""
 
     logging.info(' '.join(command))
-    process = subprocess.run(command, stdout=subprocess.PIPE, universal_newlines=True)
+    process = subprocess.run(command, stdout=subprocess.PIPE, universal_newlines=True)  # nosec
 
     return process.stdout
 
@@ -223,9 +238,9 @@ def main(args):
 
     service = make_service()
 
-    project = get_project(service, args.project_id)
-    filter = 'parent.id:{}'.format(project['parent']['id'])
-    projects = list_projects(service, filter)
+    child_project = get_project(service, args.project_id)
+    projects_filter = 'parent.id:{} lifecycleState:ACTIVE'.format(child_project['parent']['id'])
+    projects = list_projects(service, projects_filter)
 
     client = secretmanager_v1.SecretManagerServiceClient()
     secrets_doc = read_secrets(args.secrets_file)
@@ -235,6 +250,7 @@ def main(args):
         project_id = project['projectId']
         logging.info('Checking secrets in {}'.format(project_id))
 
+        project_secrets_specified = bool(get_project_secrets_spec(secrets_doc, project_id))
         secrets = get_secrets(secrets_doc, project_id)
         permissions = get_permissions(secrets_doc, project_id)
 
@@ -245,7 +261,12 @@ def main(args):
             create_secret(location, project_id, secret_id)
 
         for secret_id in list(set(gcp_secrets) - set(secrets)):
-            delete_secret(client, project_id, secret_id)
+            if project_secrets_specified:
+                delete_secret(client, project_id, secret_id)
+            else:
+                logging.error('Secret {} exists but its project {} is not in secrets.json'.format(secret_id,
+                                                                                                  project_id))
+                sys.exit(1)
 
         gcp_secrets = list_secrets(client, project_id)
 
